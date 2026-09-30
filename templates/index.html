@@ -21,10 +21,36 @@
             width: 100%;
         }
         .progress {
+            display: flex;
+            justify-content: space-between;
             color: #666;
             font-size: 14px;
             margin-bottom: 8px;
         }
+        .timer {
+            font-weight: 600;
+            color: #4a90e2;
+        }
+        .timer.low {
+            color: #ef4444;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            50% { opacity: 0.5; }
+        }
+        .timer-bar {
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .timer-bar > div {
+            height: 100%;
+            background: #4a90e2;
+            transition: width 1s linear;
+        }
+        .timer-bar > div.low { background: #ef4444; }
         h2 { margin-top: 0; }
         img {
             display: block;
@@ -80,6 +106,7 @@
         }
         .feedback.ok { background: #d1fae5; color: #065f46; }
         .feedback.bad { background: #fee2e2; color: #991b1b; }
+        .feedback.timeout { background: #fef3c7; color: #92400e; }
         @media (max-width: 500px) {
             .options { grid-template-columns: 1fr; }
         }
@@ -87,13 +114,26 @@
 </head>
 <body>
     <div class="card">
-        <div class="progress">Вопрос {{ current }} из {{ total }} · Счёт: {{ score }}</div>
+        <div class="progress">
+            <span>Вопрос {{ current }} из {{ total }}</span>
+            <span>Счёт: {{ score }}</span>
+        </div>
+
+        {% if not feedback %}
+            <div class="progress">
+                <span></span>
+                <span class="timer" id="timer">⏱ {{ time_limit }} с</span>
+            </div>
+            <div class="timer-bar">
+                <div id="timer-bar-fill" style="width: 100%"></div>
+            </div>
+        {% endif %}
+
         <h2>{{ q.question }}</h2>
         <img src="/static/{{ q.image }}" alt="question image">
 
         {% if not feedback %}
-            {# Пользователь ещё не отвечал — все кнопки кликабельны #}
-            <form method="POST" action="/answer">
+            <form method="POST" action="/answer" id="answer-form">
                 <div class="options">
                     {% for option in q.options %}
                         <button type="submit" name="answer" value="{{ loop.index0 }}">
@@ -102,8 +142,41 @@
                     {% endfor %}
                 </div>
             </form>
+
+            <script>
+                const LIMIT = {{ time_limit }};
+                let remaining = LIMIT;
+                const timerEl = document.getElementById('timer');
+                const barEl = document.getElementById('timer-bar-fill');
+                const formEl = document.getElementById('answer-form');
+
+                function tick() {
+                    remaining -= 1;
+                    if (remaining < 0) remaining = 0;
+
+                    timerEl.textContent = '⏱ ' + remaining + ' с';
+                    barEl.style.width = (remaining / LIMIT * 100) + '%';
+
+                    if (remaining <= 5) {
+                        timerEl.classList.add('low');
+                        barEl.classList.add('low');
+                    }
+
+                    if (remaining <= 0) {
+                        clearInterval(intervalId);
+                        // Отправляем форму без answer → сработает Form(-1) на сервере
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'answer';
+                        input.value = '-1';
+                        formEl.appendChild(input);
+                        formEl.submit();
+                    }
+                }
+
+                const intervalId = setInterval(tick, 1000);
+            </script>
         {% else %}
-            {# Уже ответил — подсвечиваем правильный/неправильный #}
             <div class="options">
                 {% for option in q.options %}
                     {% set idx = loop.index0 %}
@@ -118,13 +191,17 @@
                 {% endfor %}
             </div>
 
-            <div class="feedback {{ 'ok' if feedback.is_correct else 'bad' }}">
-                {% if feedback.is_correct %}
-                    ✅ Правильно!
-                {% else %}
+            {% if feedback.timed_out %}
+                <div class="feedback timeout">
+                    ⏱ Время вышло! Правильный ответ: <b>{{ q.options[feedback.correct] }}</b>
+                </div>
+            {% elif feedback.is_correct %}
+                <div class="feedback ok">✅ Правильно!</div>
+            {% else %}
+                <div class="feedback bad">
                     ❌ Неверно. Правильный ответ: <b>{{ q.options[feedback.correct] }}</b>
-                {% endif %}
-            </div>
+                </div>
+            {% endif %}
 
             <form method="POST" action="/next">
                 <button type="submit" class="next-btn">

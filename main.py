@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import URLSafeSerializer, BadSignature
 import random
+import time
 
 from questions import QUESTIONS
 
@@ -14,6 +15,7 @@ templates = Jinja2Templates(directory="templates")
 SECRET = "ertev<JNKdf"
 serializer = URLSafeSerializer(SECRET)
 COOKIE_NAME = "quiz_state"
+QUESTION_TIME_LIMIT = 15  # секунд на вопрос
 
 
 # ---------- Работа с состоянием в cookie ----------
@@ -63,9 +65,12 @@ async def show_question(request: Request):
     if state["current"] >= len(state["order"]):
         return RedirectResponse("/result", status_code=303)
 
+    # Фиксируем момент показа вопроса
+    state["started_at"] = time.time()
+
     q = QUESTIONS[state["order"][state["current"]]]
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request,
         "index.html",
         {
@@ -74,13 +79,17 @@ async def show_question(request: Request):
             "total": len(state["order"]),
             "score": state["score"],
             "feedback": None,
+            "time_limit": QUESTION_TIME_LIMIT,
         },
     )
+    set_state(response, state)  # ← вот этой строки не хватало
+    return response
 
 
 # ---------- Обработка ответа ----------
 @app.post("/answer", response_class=HTMLResponse)
-async def answer(request: Request, answer: int = Form(...)):
+async def answer(request: Request, answer: int = Form(-1)):
+
     state = get_state(request)
     if not state:
         return RedirectResponse("/", status_code=303)
@@ -89,7 +98,14 @@ async def answer(request: Request, answer: int = Form(...)):
         return RedirectResponse("/result", status_code=303)
 
     q = QUESTIONS[state["order"][state["current"]]]
-    is_correct = (answer == q["answer"])
+    # Проверка таймаута
+    started_at = state.get("started_at", 0)
+    elapsed = time.time() - started_at
+    timed_out = elapsed > QUESTION_TIME_LIMIT
+
+    # answer = -1 означает "клиент не успел / таймер истёк"
+    is_correct = (not timed_out) and (answer == q["answer"])
+
     if is_correct:
         state["score"] += 1
 
@@ -106,12 +122,17 @@ async def answer(request: Request, answer: int = Form(...)):
                 "chosen": answer,
                 "correct": q["answer"],
                 "is_correct": is_correct,
+                "timed_out": timed_out,
+
             },
+            "time_limit": QUESTION_TIME_LIMIT,
+
             "next_url": f"/next",
         },
     )
 
     set_state(response, state)
+
     return response
 
 
@@ -123,6 +144,8 @@ async def next_question(request: Request):
         return RedirectResponse("/", status_code=303)
 
     state["current"] += 1
+    state.pop("started_at", None)
+
     response = RedirectResponse("/question", status_code=303)
     set_state(response, state)
     return response
