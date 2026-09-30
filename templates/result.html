@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Результат</title>
+    <style>
+        body {
+            font-family: system-ui, Arial, sans-serif;
+            background: #f4f6f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+        h1 { margin: 0 0 16px; }
+        .score { font-size: 48px; color: #4a90e2; font-weight: bold; }
+        a {
+            display: inline-block;
+            margin-top: 24px;
+            padding: 12px 24px;
+            background: #4a90e2;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Викторина завершена!</h1>
+        <div class="score">{{ score }} / {{ total }}</div>
+        <a href="{{ url_for('start') }}">Пройти заново</a>
+
+    </div>
+</body>
+</html>

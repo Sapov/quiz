@@ -1,0 +1,8 @@
+[project]
+name = "quiz"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.142.2",
+    "itsdangerous>=2.2.0",
+]

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Викторина</title>
+    <style>
+        body {
+            font-family: system-ui, Arial, sans-serif;
+            background: #f4f6f8;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            padding: 30px;
+            max-width: 640px;
+            width: 100%;
+        }
+        .progress {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        h2 { margin-top: 0; }
+        img {
+            display: block;
+            max-width: 100%;
+            max-height: 320px;
+            margin: 20px auto;
+            border-radius: 10px;
+        }
+        .options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        button {
+            padding: 14px;
+            font-size: 16px;
+            border: 2px solid #4a90e2;
+            background: white;
+            color: #4a90e2;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.15s;
+            width: 100%;
+        }
+        button:hover:not(:disabled) {
+            background: #4a90e2;
+            color: white;
+        }
+        button.correct {
+            background: #d1fae5 !important;
+            border-color: #10b981 !important;
+            color: #065f46 !important;
+        }
+        button.wrong {
+            background: #fee2e2 !important;
+            border-color: #ef4444 !important;
+            color: #991b1b !important;
+        }
+        button:disabled { cursor: default; }
+        .next-btn {
+            margin-top: 20px;
+            background: #10b981;
+            border-color: #10b981;
+            color: white;
+        }
+        .next-btn:hover { background: #059669; }
+        .feedback {
+            margin-top: 16px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+        .feedback.ok { background: #d1fae5; color: #065f46; }
+        .feedback.bad { background: #fee2e2; color: #991b1b; }
+        @media (max-width: 500px) {
+            .options { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="progress">Вопрос {{ current }} из {{ total }} · Счёт: {{ score }}</div>
+        <h2>{{ q.question }}</h2>
+        <img src="/static/{{ q.image }}" alt="question image">
+
+        {% if not feedback %}
+            {# Пользователь ещё не отвечал — все кнопки кликабельны #}
+            <form method="POST" action="/answer">
+                <div class="options">
+                    {% for option in q.options %}
+                        <button type="submit" name="answer" value="{{ loop.index0 }}">
+                            {{ option }}
+                        </button>
+                    {% endfor %}
+                </div>
+            </form>
+        {% else %}
+            {# Уже ответил — подсвечиваем правильный/неправильный #}
+            <div class="options">
+                {% for option in q.options %}
+                    {% set idx = loop.index0 %}
+                    {% if idx == feedback.correct %}
+                        {% set cls = "correct" %}
+                    {% elif idx == feedback.chosen and not feedback.is_correct %}
+                        {% set cls = "wrong" %}
+                    {% else %}
+                        {% set cls = "" %}
+                    {% endif %}
+                    <button type="button" class="{{ cls }}" disabled>{{ option }}</button>
+                {% endfor %}
+            </div>
+
+            <div class="feedback {{ 'ok' if feedback.is_correct else 'bad' }}">
+                {% if feedback.is_correct %}
+                    ✅ Правильно!
+                {% else %}
+                    ❌ Неверно. Правильный ответ: <b>{{ q.options[feedback.correct] }}</b>
+                {% endif %}
+            </div>
+
+            <form method="POST" action="/next">
+                <button type="submit" class="next-btn">
+                    {% if current >= total %}Показать результат{% else %}Следующий вопрос →{% endif %}
+                </button>
+            </form>
+        {% endif %}
+    </div>
+</body>
+</html>
